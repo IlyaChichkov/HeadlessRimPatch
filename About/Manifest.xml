@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Manifest>
+    <identifier>redeyedev.headlessrim</identifier>
+    <version>0.1.0</version>
+    <manifestUri>
+        https://raw.githubusercontent.com/IlyaChichkov/HeadlessRimPatch/refs/heads/main/About/Manifest.xml</manifestUri>
+    <downloadUri>https://github.com/IlyaChichkov/HeadlessRimPatch/releases</downloadUri>
+</Manifest>
