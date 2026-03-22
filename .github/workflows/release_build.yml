@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        version: [1.6]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+        
+    - name: Build for RimWorld ${{ matrix.version }}
+      run: |
+        cd Source
+        # Build the .csproj file directly from the Source folder
+        dotnet build HeadlessRim.csproj -c Release-${{ matrix.version }} --nologo --verbosity minimal
+        
+    - name: Upload Assemblies for ${{ matrix.version }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: assemblies-${{ matrix.version }}
+        path: ${{ matrix.version }}/Assemblies/
+        retention-days: 30
+        
+  release:
+    runs-on: windows-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download All Assemblies
+      uses: actions/download-artifact@v4
+      with:
+        path: downloaded-assemblies
+        
+    - name: Setup Combined Release Structure
+      run: |
+        $tagVersion = $env:GITHUB_REF -replace 'refs/tags/v', ''
+        $modName = "HeadlessRimPatch"
+        $zipName = "$modName-$tagVersion.zip"
+        
+        # Create main temp directory
+        New-Item -ItemType Directory -Force -Path "temp_release"
+        
+        # Safely copy common RimWorld folders if they exist
+        $foldersToCopy = @("About", "Languages", "Defs", "Textures", "Sounds", "Patches")
+        foreach ($folder in $foldersToCopy) {
+            if (Test-Path $folder) {
+                Copy-Item $folder -Destination "temp_release/" -Recurse -Force
+            }
+        }
+        
+        # Create version folders and copy assemblies
+        foreach ($ver in @("1.6")) {
+            if (Test-Path "downloaded-assemblies/assemblies-$ver") {
+                New-Item -ItemType Directory -Force -Path "temp_release/$ver/Assemblies"
+                Copy-Item "downloaded-assemblies/assemblies-$ver/*" -Destination "temp_release/$ver/Assemblies/" -Recurse -Force
+            } else {
+                Write-Warning "No $ver assemblies found"
+            }
+        }
+        
+        # Debug: Show the structure
+        Write-Host "Final directory structure:"
+        Get-ChildItem "temp_release" -Recurse | ForEach-Object { Write-Host $_.FullName }
+        
+        # Create the combined zip file
+        Compress-Archive -Path "temp_release/*" -DestinationPath $zipName -CompressionLevel Optimal
+        
+        # Cleanup
+        Remove-Item "temp_release" -Recurse -Force
+        Remove-Item "downloaded-assemblies" -Recurse -Force
+        
+        echo "Created combined release: $zipName"
+      shell: pwsh
+      
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: HeadlessRimPatch-*.zip
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
