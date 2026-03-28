@@ -19,10 +19,10 @@ namespace HeadlessRim
             Patch(harmony, typeof(Graphic_Single), "TryInsertIntoAtlas", nameof(SkipPrefix));
             Patch(harmony, typeof(Graphic_Multi), "TryInsertIntoAtlas", nameof(SkipPrefix));
             Patch(harmony, typeof(Graphic_Collection), "TryInsertIntoAtlas", nameof(SkipPrefix));
-            
+
             var graphicRandomType = AccessTools.TypeByName("Verse.Graphic_Random");
             if (graphicRandomType != null) Patch(harmony, graphicRandomType, "TryInsertIntoAtlas", nameof(SkipPrefix));
-            
+
             var graphicLinkedType = AccessTools.TypeByName("Verse.Graphic_Linked");
             if (graphicLinkedType != null) Patch(harmony, graphicLinkedType, "TryInsertIntoAtlas", nameof(SkipPrefix));
 
@@ -67,6 +67,7 @@ namespace HeadlessRim
 
             // SCENE MANAGEMENT & SAFETY
             Patch(harmony, typeof(Root_Play), "Update", nameof(SafeRootPlayUpdatePrefix));
+            Patch(harmony, typeof(Root), "Shutdown", nameof(RootShutdownPrefix));
 
             // AUDIO
             Patch(harmony, typeof(SoundStarter), "PlayOneShot", nameof(SkipPrefix));
@@ -109,13 +110,15 @@ namespace HeadlessRim
         {
             try
             {
-                if (LongEventHandler.ShouldWaitForEvent) return false;
-
+                // ALWAYS pump long events. This handles ExecuteWhenFinished actions.
                 bool sceneChanged = false;
                 LongEventHandler.LongEventsUpdate(out sceneChanged);
                 if (sceneChanged) return false;
 
-                // Extra safety: if we are supposed to be in main menu but Root_Play is still ticking, skip.
+                // If a long event is STILL blocking (e.g. loading a map), skip the tick.
+                if (LongEventHandler.ShouldWaitForEvent) return false;
+
+                // if we are supposed to be in main menu but Root_Play is still ticking, skip.
                 if (Current.ProgramState != ProgramState.Playing) return false;
 
                 return true; // Continue to original Root_Play.Update
@@ -125,6 +128,13 @@ namespace HeadlessRim
                 Log.ErrorOnce($"[HeadlessRim] SafeRootPlayUpdate Error: {ex}", 123123);
                 return false;
             }
+        }
+
+        public static bool RootShutdownPrefix()
+        {
+            Log.Message("[HeadlessRim] Shutdown requested. Terminating process...");
+            System.Diagnostics.Process.GetCurrentProcess().Kill();
+            return false;
         }
     }
 }
