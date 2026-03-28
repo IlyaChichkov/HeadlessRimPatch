@@ -62,7 +62,11 @@ namespace HeadlessRim
             Patch(harmony, typeof(MapDrawer), "RegenerateEverythingNow", nameof(SkipPrefix));
             Patch(harmony, typeof(MapDrawer), "MapMeshDrawerUpdate_First", nameof(SkipPrefix));
             Patch(harmony, typeof(MapDrawer), "DrawMapMesh", nameof(SkipPrefix));
+            Patch(harmony, typeof(MapDrawer), "Dispose", nameof(SkipPrefix));
             Patch(harmony, typeof(Graphic), "Print", nameof(SkipPrefix));
+
+            // SCENE MANAGEMENT & SAFETY
+            Patch(harmony, typeof(Root_Play), "Update", nameof(SafeRootPlayUpdatePrefix));
 
             // AUDIO
             Patch(harmony, typeof(SoundStarter), "PlayOneShot", nameof(SkipPrefix));
@@ -99,6 +103,28 @@ namespace HeadlessRim
             bool sceneChanged = false;
             LongEventHandler.LongEventsUpdate(out sceneChanged);
             return false;
+        }
+
+        public static bool SafeRootPlayUpdatePrefix()
+        {
+            try
+            {
+                if (LongEventHandler.ShouldWaitForEvent) return false;
+
+                bool sceneChanged = false;
+                LongEventHandler.LongEventsUpdate(out sceneChanged);
+                if (sceneChanged) return false;
+
+                // Extra safety: if we are supposed to be in main menu but Root_Play is still ticking, skip.
+                if (Current.ProgramState != ProgramState.Playing) return false;
+
+                return true; // Continue to original Root_Play.Update
+            }
+            catch (Exception ex)
+            {
+                Log.ErrorOnce($"[HeadlessRim] SafeRootPlayUpdate Error: {ex}", 123123);
+                return false;
+            }
         }
     }
 }
