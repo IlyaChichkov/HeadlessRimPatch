@@ -14,12 +14,33 @@ namespace HeadlessRim
         {
             Log.Message("[HeadlessRim] Applying CRITICAL STARTUP patches...");
 
+            // Texture Atlasing (Prevents Unity Crashes in BatchMode)
             Patch(harmony, typeof(GlobalTextureAtlasManager), "TryInsertStatic", nameof(SkipPrefix));
             Patch(harmony, typeof(Graphic_Single), "TryInsertIntoAtlas", nameof(SkipPrefix));
             Patch(harmony, typeof(Graphic_Multi), "TryInsertIntoAtlas", nameof(SkipPrefix));
             Patch(harmony, typeof(Graphic_Collection), "TryInsertIntoAtlas", nameof(SkipPrefix));
+            
+            var graphicRandomType = AccessTools.TypeByName("Verse.Graphic_Random");
+            if (graphicRandomType != null) Patch(harmony, graphicRandomType, "TryInsertIntoAtlas", nameof(SkipPrefix));
+            
+            var graphicLinkedType = AccessTools.TypeByName("Verse.Graphic_Linked");
+            if (graphicLinkedType != null) Patch(harmony, graphicLinkedType, "TryInsertIntoAtlas", nameof(SkipPrefix));
 
-            Log.Message("[HeadlessRim] Finished applying patches for: [GlobalTextureAtlasManager, Graphic_Single, Graphic_Multi, Graphic_Collection]");
+            // UI & Initialization (Prevents NREs during Loading)
+            Patch(harmony, typeof(Designator_Build), "UpdateIcon", nameof(SkipPrefix));
+            Patch(harmony, typeof(LongEventHandler), "LongEventsOnGUI", nameof(SkipPrefix));
+
+            // Prevent shader database from crashing/spamming in batchmode
+            Patch(harmony, typeof(ShaderDatabase), "get_DefaultShader", nameof(ReturnNullShaderPrefix));
+
+            var widgetsType = AccessTools.TypeByName("Verse.Widgets");
+            if (widgetsType != null)
+            {
+                var method = AccessTools.Method(widgetsType, "CroppedTerrainTextureRect", new Type[] { typeof(Texture2D) });
+                if (method != null) harmony.Patch(method, prefix: new HarmonyMethod(typeof(HeadlessPatches), nameof(ReturnEmptyRectPrefix)));
+            }
+
+            Log.Message("[HeadlessRim] Finished applying CRITICAL STARTUP patches.");
         }
 
         // RUNTIME PATCHES (Run Late)
@@ -33,8 +54,6 @@ namespace HeadlessRim
             Patch(harmony, typeof(UIRoot_Entry), "UIRootOnGUI", nameof(SkipPrefix));
             Patch(harmony, typeof(UIRoot_Play), "UIRootOnGUI", nameof(SkipPrefix));
             Patch(harmony, typeof(MapInterface), "MapInterfaceOnGUI_BeforeMainTabs", nameof(SkipPrefix));
-            Patch(harmony, typeof(LongEventHandler), "LongEventsOnGUI", nameof(SkipPrefix));
-            Patch(harmony, typeof(Designator_Build), "UpdateIcon", nameof(SkipPrefix));
 
             // MAP MESH GENERATION (Prevents Gameplay NREs)
             Patch(harmony, typeof(Section), "RegenerateAllLayers", nameof(SkipPrefix));
@@ -56,7 +75,7 @@ namespace HeadlessRim
             if (portraitOriginal != null)
                 harmony.Patch(portraitOriginal, prefix: new HarmonyMethod(typeof(HeadlessPatches), nameof(ReturnNullTexturePrefix)));
 
-            Log.Message("[HeadlessRim] Finished applying patches for: [UI Loop, Mesh generation, Audio, Portraits]");
+            Log.Message("[HeadlessRim] Finished applying RUNTIME patches.");
         }
 
         // Helpers
@@ -72,6 +91,8 @@ namespace HeadlessRim
 
         public static bool SkipPrefix() => false;
         public static bool ReturnNullTexturePrefix(ref Texture __result) { __result = null; return false; }
+        public static bool ReturnNullShaderPrefix(ref Shader __result) { __result = null; return false; }
+        public static bool ReturnEmptyRectPrefix(ref Rect __result) { __result = Rect.zero; return false; }
 
         public static bool EntryUpdateReplacement()
         {
