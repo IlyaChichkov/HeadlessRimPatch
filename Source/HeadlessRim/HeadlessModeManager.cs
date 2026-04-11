@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using HarmonyLib;
 using Verse;
-using RimWorld;
 
 namespace HeadlessRim
 {
@@ -50,11 +49,7 @@ namespace HeadlessRim
                 var harmony = new Harmony("com.headlessrim.core");
                 HeadlessPatches.ApplyRuntimePatches(harmony);
 
-                // START QUICK DEV GAME
-                Root_Play.SetupForQuickTestPlay();
-
-                Log.Message("[HeadlessRim] Map Generation Queued. Forcing Synchronous Load Loop...");
-                Log.Message("[HeadlessRim] Game Loop Active.");
+                Log.Message("[HeadlessRim] Headless mode active. Waiting for external control.");
             }
             catch (Exception ex)
             {

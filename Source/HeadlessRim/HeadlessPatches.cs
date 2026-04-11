@@ -28,7 +28,6 @@ namespace HeadlessRim
             Log.Message("[HeadlessRim] Applying RUNTIME patches (UI, Map, Audio)...");
 
             // UI LOOP & DRAWING
-            Patch(harmony, typeof(UIRoot_Entry), "UIRootUpdate", nameof(EntryUpdateReplacement));
             Patch(harmony, typeof(UIRoot_Play), "UIRootUpdate", nameof(SkipPrefix));
             Patch(harmony, typeof(UIRoot_Entry), "UIRootOnGUI", nameof(SkipPrefix));
             Patch(harmony, typeof(UIRoot_Play), "UIRootOnGUI", nameof(SkipPrefix));
@@ -72,12 +71,5 @@ namespace HeadlessRim
 
         public static bool SkipPrefix() => false;
         public static bool ReturnNullTexturePrefix(ref Texture __result) { __result = null; return false; }
-
-        public static bool EntryUpdateReplacement()
-        {
-            bool sceneChanged = false;
-            LongEventHandler.LongEventsUpdate(out sceneChanged);
-            return false;
-        }
     }
 }
